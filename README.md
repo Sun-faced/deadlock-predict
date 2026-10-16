@@ -43,7 +43,7 @@ That is four prediction tasks, but six numbers because kills and mid-bosses have
 
 The match data comes from the community [Deadlock API](https://deadlock-api.com/). The saved datasets currently cover **August 1 to September 28, 2026**. They contain **1,727,287 unranked matches** and **940,755 ranked matches**.
 
-We train on all unranked matches and test on ranked matches. This is a deliberate constraint: we want to see how well a model trained in one mode works in the other. The baseline computes its averages from the full unranked dataset. The linear model and four MLPs also train on the full set. This run uses a fixed number of epochs and does not use validation to choose an epoch. Setting a positive `patience` for a learned model switches back to the time-based training and validation split.
+We train on unranked matches and test on ranked matches. This is a deliberate constraint: we want to see how well a model trained in one mode works in the other. The baseline computes its averages from the full unranked dataset. The linear model and four MLPs train on the earliest 80% of unranked matches and use the next 10% for validation. They keep the epoch with the lowest validation loss. The newest 10% of unranked matches are outside those training and validation splits.
 
 Each match has **63 input numbers**, all meant to be known before the match:
 
@@ -93,7 +93,7 @@ Each task MLP has **four hidden linear layers** in total: two for players and tw
 
 ## How we test
 
-After training, the script prints accuracy on the unranked matches used for training and saves it in `training_accuracy.json` inside each model's results folder. These are in-sample scores: they show how well the models predict matches they have already trained on, so they can look better than scores on new matches.
+After training, the script prints accuracy on all unranked matches and saves it in `training_accuracy.json` inside each model's results folder. For the linear model and MLPs, these scores combine matches used for training, validation, and the remaining unranked test split. They are not a separate ranked test score.
 
 We then use the same separate ranked test matches and rules for every model:
 
@@ -110,33 +110,33 @@ Each plot shows results by rank. A bar is **100% of the matches in that rank**: 
 
 ## Results
 
-These are the current percentages on the ranked test plots. All three approaches use the full unranked dataset for training. The linear model uses all input groups, and the MLP column combines the four independently trained task models.
+These are the current percentages on the ranked test plots. The baseline uses the full unranked dataset; the learned models train on its earliest 80%. The linear model uses all input groups, and the MLP column combines the four independently trained task models.
 
 | Prediction | Baseline | Linear | MLP |
 | --- | ---: | ---: | ---: |
-| Winner | 50.6% | 58.0% | **58.5%** |
-| Duration | 39.2% | **43.2%** | **43.2%** |
-| Kills, side 0 | **25.5%** | 20.7% | 22.6% |
-| Kills, side 1 | **22.3%** | 20.7% | 22.2% |
-| Mid-bosses, side 0 | **36.9%** | 36.6% | 36.7% |
-| Mid-bosses, side 1 | **36.5%** | 36.2% | 36.3% |
+| Winner | 50.6% | 58.0% | **60.1%** |
+| Duration | 39.2% | **43.2%** | 42.5% |
+| Kills, side 0 | **25.5%** | 20.3% | 22.9% |
+| Kills, side 1 | 22.3% | 20.3% | **22.5%** |
+| Mid-bosses, side 0 | **36.9%** | 36.6% | **36.9%** |
+| Mid-bosses, side 1 | **36.5%** | 36.2% | **36.5%** |
 
-We also measured accuracy on all **1,727,287 unranked training matches** using the same rules. These numbers show how well each model predicts matches it learned from; the ranked test table above is the better check on new matches.
+We also measured accuracy on all **1,727,287 unranked matches** using the same rules. For the learned models, this includes matches outside their training split; the ranked test table above shows how they perform in the other match mode.
 
-| Prediction | Baseline training | Linear training | MLP training |
+| Prediction | Baseline, unranked | Linear, unranked | MLP, unranked |
 | --- | ---: | ---: | ---: |
-| Winner | 50.1% | 61.1% | 63.3% |
-| Duration | 40.3% | 40.8% | 41.0% |
-| Kills, side 0 | 22.2% | 22.2% | 22.9% |
-| Kills, side 1 | 19.9% | 22.3% | 22.8% |
-| Mid-bosses, side 0 | 38.1% | 38.5% | 39.2% |
-| Mid-bosses, side 1 | 38.0% | 38.4% | 39.1% |
+| Winner | 50.1% | 61.0% | 62.8% |
+| Duration | 40.3% | 40.9% | 40.7% |
+| Kills, side 0 | 22.2% | 22.0% | 23.1% |
+| Kills, side 1 | 19.9% | 22.1% | 23.1% |
+| Mid-bosses, side 0 | 38.1% | 38.5% | 39.0% |
+| Mid-bosses, side 1 | 38.0% | 38.4% | 38.9% |
 
-Compared with the earlier 80%-training runs, the MLP's ranked winner score fell from **60.3% to 58.5%**, while its duration score rose from **42.4% to 43.2%**. The other changes are small. The training data and the way we choose the final epoch both changed, so these differences do not tell us which change caused them. The models also use different training settings, and more tuning could change the scores.
+The MLP has the highest ranked winner score. The linear model scores highest on duration, while the baseline remains strongest for side 0 kills. The models use different training settings, and more tuning could change these scores.
 
 ### Winner
 
-The independent MLP gets the winner right in **58.5%** of ranked matches with a known rank. That is **7.9 percentage points** above the baseline and **0.5 points** above the all-input linear model. Its training score is **63.3%**. That gap does not measure overfitting by itself, because training uses unranked matches and testing uses ranked matches.
+The independent MLP gets the winner right in **60.1%** of ranked matches with a known rank. That is **9.5 percentage points** above the baseline and **2.1 points** above the all-input linear model. Its score across all unranked matches is **62.8%**. The gap between these scores does not measure overfitting by itself, because the unranked score includes validation and test splits and the ranked matches come from a different mode.
 
 ![Winner predictions by rank for the independent MLP](results/mlp/independent/MLPModel_match_outcome.png)
 
@@ -144,15 +144,15 @@ The independent MLP gets the winner right in **58.5%** of ranked matches with a 
 
 ### Match duration
 
-The linear model and MLP both score **43.2%** after rounding to one decimal place: their predictions are within 10% of the real match length. The baseline reaches **39.2%**. The MLP improved on its earlier **42.4%** result, but it does not clearly beat the linear model here.
+The linear model scores **43.2%**, the MLP **42.5%**, and the baseline **39.2%**. A duration prediction counts as correct when it is within 10% of the real match length.
 
-![Duration predictions by rank for the independent MLP](results/mlp/independent/MLPModel_match_time.png)
+![Duration predictions by rank for the linear model](results/linear/id_lanes_parties_experience_flags/LinearModel_match_time.png)
 
-[Baseline duration plot](results/baseline/Baseline_match_time.png) | [Linear duration plot](results/linear/id_lanes_parties_experience_flags/LinearModel_match_time.png)
+[Baseline duration plot](results/baseline/Baseline_match_time.png) | [MLP duration plot](results/mlp/independent/MLPModel_match_time.png)
 
 ### Kills
 
-Kills are harder under the 10% rule. For side 0, the baseline scores **25.5%**, the MLP **22.6%**, and the all-input linear model **20.7%**. For side 1, they score **22.3%**, **22.2%**, and **20.7%**, respectively. The MLP improves on the linear model, but it does not beat the baseline here.
+Kills are harder under the 10% rule. For side 0, the baseline scores **25.5%**, the MLP **22.9%**, and the all-input linear model **20.3%**. For side 1, the MLP scores **22.5%**, the baseline **22.3%**, and the linear model **20.3%**.
 
 ![Side 0 kill predictions by rank for the baseline](results/baseline/Baseline_kills_side_0.png)
 
@@ -160,7 +160,7 @@ Kills are harder under the 10% rule. For side 0, the baseline scores **25.5%**, 
 
 ### Mid-bosses
 
-The baseline scores **36.9%** for side 0 and **36.5%** for side 1. The MLP is close at **36.7%** and **36.3%**; the linear model gets **36.6%** and **36.2%**. The baseline's average is about **0.9 mid-bosses per side**, which rounds to one. One mid-boss is common in the ranked data, so this simple prediction is already hard to improve on under the exact-count rule.
+The baseline and MLP both score **36.9%** for side 0 and **36.5%** for side 1 after rounding to one decimal place. The linear model gets **36.6%** and **36.2%**. The baseline's average is about **0.9 mid-bosses per side**, which rounds to one. One mid-boss is common in the ranked data, so this simple prediction is already hard to improve on under the exact-count rule.
 
 ![Side 0 mid-boss predictions by rank for the baseline](results/baseline/Baseline_mid-bosses_side_0.png)
 
