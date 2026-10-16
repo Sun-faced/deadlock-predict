@@ -1,0 +1,11 @@
+{
+  "matches": 1727287,
+  "accuracy": {
+    "Match outcome": 0.501437803908673,
+    "Match time": 0.40317735269240146,
+    "Kills, side 0": 0.22205053358243304,
+    "Kills, side 1": 0.19857730649278318,
+    "Mid-bosses, side 0": 0.381326901667181,
+    "Mid-bosses, side 1": 0.3803178047423503
+  }
+}

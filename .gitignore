@@ -1,0 +1,5 @@
+deadlock_cache/*
+data/*
+.venv/
+__pycache__/
+.idea/
